@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+dist/
+build/
+*.egg-info/
+.eggs/
+
+# Environment
+.env
+*.env.local
+
+# Testing
+.pytest_cache/
+*.db
+htmlcov/
+.coverage
+coverage.xml
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+logs/
+
+# Docker
+.dockerignore
+
+# Alembic
+alembic/versions/*.py~
+
+# Node (if any)
+node_modules/
+npm-debug.log*

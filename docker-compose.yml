@@ -1,0 +1,46 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: payment_simulator_db
+    environment:
+      POSTGRES_USER: payment_user
+      POSTGRES_PASSWORD: payment_pass
+      POSTGRES_DB: payment_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U payment_user -d payment_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: payment_simulator_backend
+    environment:
+      DATABASE_URL: postgresql://payment_user:payment_pass@db:5432/payment_db
+      WEBHOOK_SECRET: whsec_payment_simulator_secret_key_2024
+      PAYMENT_FAILURE_RATE: "0.15"
+      WEBHOOK_DELIVERY_FAILURE_RATE: "0.20"
+      MAX_RETRY_ATTEMPTS: "5"
+      RETRY_BASE_DELAY: "1.0"
+      WEBHOOK_ENDPOINT_URL: http://backend:8000/api/v1/webhooks/receive
+      DEBUG: "true"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - ./frontend:/app/frontend
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

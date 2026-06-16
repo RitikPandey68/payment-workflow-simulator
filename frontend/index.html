@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Payment Workflow Simulator — Transaction & Webhook Engine</title>
+  <meta name="description" content="Simulate end-to-end payment gateway flows including order creation, payment processing, webhook callbacks, refund handling, and retry logic — replicating real-world Razorpay merchant integration pitfalls." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <!-- ── Sidebar Navigation ─────────────────────────────────────────────── -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">
+        <div class="logo-icon">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+            <rect width="28" height="28" rx="8" fill="url(#logoGrad)"/>
+            <path d="M8 14l4 4 8-8" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <defs>
+              <linearGradient id="logoGrad" x1="0" y1="0" x2="28" y2="28">
+                <stop offset="0%" stop-color="#6366f1"/>
+                <stop offset="100%" stop-color="#8b5cf6"/>
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+        <div class="logo-text">
+          <span class="logo-title">PaySim</span>
+          <span class="logo-sub">v1.0.0</span>
+        </div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Main</div>
+      <a href="#" class="nav-item active" data-tab="dashboard" id="nav-dashboard">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+          <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+        </svg>
+        Dashboard
+      </a>
+      <a href="#" class="nav-item" data-tab="simulator" id="nav-simulator">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/><polygon points="10,8 16,12 10,16"/>
+        </svg>
+        Simulator
+      </a>
+
+      <div class="nav-section-label">Monitoring</div>
+      <a href="#" class="nav-item" data-tab="transactions" id="nav-transactions">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 6h18M3 12h18M3 18h18"/>
+        </svg>
+        Transactions
+        <span class="nav-badge" id="badge-transactions">0</span>
+      </a>
+      <a href="#" class="nav-item" data-tab="webhooks" id="nav-webhooks">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/>
+          <line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/>
+        </svg>
+        Webhooks
+        <span class="nav-badge webhook-badge" id="badge-webhooks">0</span>
+      </a>
+      <a href="#" class="nav-item" data-tab="refunds" id="nav-refunds">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/>
+        </svg>
+        Refunds
+      </a>
+
+      <div class="nav-section-label">Analysis</div>
+      <a href="#" class="nav-item" data-tab="retry" id="nav-retry">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M2.5 2v6h6"/><path d="M21.5 22v-6h-6"/>
+          <path d="M22 11.5A10 10 0 0 0 3.2 7.2M2 12.5a10 10 0 0 0 18.8 4.2"/>
+        </svg>
+        Retry Engine
+      </a>
+      <a href="#" class="nav-item" data-tab="pitfalls" id="nav-pitfalls">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+          <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+        </svg>
+        Pitfalls Lab
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="api-status" id="api-status">
+        <span class="status-dot" id="status-dot"></span>
+        <span id="status-text">Connecting...</span>
+      </div>
+      <a href="http://localhost:8000/docs" target="_blank" class="docs-link">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/>
+          <line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+        </svg>
+        API Docs
+      </a>
+    </div>
+  </aside>
+
+  <!-- ── Main Content ────────────────────────────────────────────────────── -->
+  <main class="main-content">
+
+    <!-- ── Header ──────────────────────────────────────────────────────── -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <h1 id="page-title">Dashboard</h1>
+        <span class="page-subtitle" id="page-subtitle">Real-time payment gateway simulation</span>
+      </div>
+      <div class="topbar-right">
+        <button class="btn btn-ghost" id="btn-refresh" onclick="window.App.refresh()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+            <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+          </svg>
+          Refresh
+        </button>
+        <button class="btn btn-danger-ghost" id="btn-reset" onclick="window.App.resetData()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+            <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+          </svg>
+          Reset Data
+        </button>
+      </div>
+    </header>
+
+    <!-- ════════════════════════════════════════════════════════════════════
+         TAB: DASHBOARD
+    ════════════════════════════════════════════════════════════════════ -->
+    <div class="tab-content active" id="tab-dashboard">
+      <!-- Stats Grid -->
+      <div class="stats-grid">
+        <div class="stat-card" id="stat-revenue">
+          <div class="stat-icon revenue-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22">
+              <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+            </svg>
+          </div>
+          <div class="stat-info">
+            <span class="stat-label">Total Revenue</span>
+            <span class="stat-value" id="val-revenue">₹0</span>
+            <span class="stat-change positive" id="chg-revenue">Captured payments</span>
+          </div>
+        </div>
+        <div class="stat-card" id="stat-orders">
+          <div class="stat-icon orders-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22">
+              <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/>
+              <path d="M16 10a4 4 0 0 1-8 0"/>
+            </svg>
+          </div>
+          <div class="stat-info">
+            <span class="stat-label">Total Orders</span>
+            <span class="stat-value" id="val-orders">0</span>
+            <span class="stat-change" id="chg-orders">All statuses</span>
+          </div>
+        </div>
+        <div class="stat-card" id="stat-success">
+          <div class="stat-icon success-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+          </div>
+          <div class="stat-info">
+            <span class="stat-label">Success Rate</span>
+            <span class="stat-value" id="val-success">0%</span>
+            <span class="stat-change" id="chg-success">Payment capture rate</span>
+          </div>
+        </div>
+        <div class="stat-card" id="stat-webhooks">
+          <div class="stat-icon webhook-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22">
+              <path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/>
+            </svg>
+          </div>
+          <div class="stat-info">
+            <span class="stat-label">Webhook Events</span>
+            <span class="stat-value" id="val-webhooks">0</span>
+            <span class="stat-change" id="chg-webhooks">Total fired</span>
+          </div>
+        </div>
+        <div class="stat-card" id="stat-refunds">
+          <div class="stat-icon refund-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22">
+              <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/>
+            </svg>
+          </div>
+          <div class="stat-info">
+            <span class="stat-label">Total Refunded</span>
+            <span class="stat-value" id="val-refunds">₹0</span>
+            <span class="stat-change" id="chg-refunds">Refunded amount</span>
+          </div>
+        </div>
+        <div class="stat-card" id="stat-duplicates">
+          <div class="stat-icon warning-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+          </div>
+          <div class="stat-info">
+            <span class="stat-label">Duplicate Webhooks</span>
+            <span class="stat-value" id="val-duplicates">0</span>
+            <span class="stat-change warning" id="chg-duplicates">Detected & flagged</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Charts Row -->
+      <div class="charts-row">
+        <div class="chart-card">
+          <div class="chart-header">
+            <h3>Payment Status Distribution</h3>
+            <span class="chart-subtitle">All-time breakdown</span>
+          </div>
+          <div class="donut-wrapper">
+            <canvas id="chart-payment-status" width="220" height="220"></canvas>
+            <div class="donut-legend" id="legend-payment-status"></div>
+          </div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-header">
+            <h3>Webhook Delivery Status</h3>
+            <span class="chart-subtitle">Retry queue health</span>
+          </div>
+          <div class="donut-wrapper">
+            <canvas id="chart-webhook-status" width="220" height="220"></canvas>
+            <div class="donut-legend" id="legend-webhook-status"></div>
+          </div>
+        </div>
+        <div class="chart-card flex-2">
+          <div class="chart-header">
+            <h3>Failure Breakdown</h3>
+            <span class="chart-subtitle">Payment failure reasons</span>
+          </div>
+          <div class="bar-chart-wrapper">
+            <canvas id="chart-failures" width="100%" height="200"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Feed -->
+      <div class="live-feed-card">
+        <div class="feed-header">
+          <h3>
+            <span class="live-dot"></span>
+            Live Transaction Feed
+          </h3>
+          <span class="feed-subtitle">Auto-refreshes every 3s</span>
+        </div>
+        <div class="feed-list" id="live-feed">
+          <div class="feed-empty">No transactions yet. Use the Simulator to create some.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════════
+         TAB: SIMULATOR
+    ════════════════════════════════════════════════════════════════════ -->
+    <div class="tab-content" id="tab-simulator">
+      <div class="simulator-layout">
+        <!-- Step 1: Create Order -->
+        <div class="sim-step-card" id="step-order">
+          <div class="step-header">
+            <div class="step-number">1</div>
+            <div class="step-meta">
+              <h3>Create Order</h3>
+              <p>Initialize a new payment order</p>
+            </div>
+          </div>
+          <form id="form-order" class="sim-form">
+            <div class="form-row">
+              <div class="form-group">
+                <label for="order-merchant">Merchant ID</label>
+                <input type="text" id="order-merchant" value="merchant_001" placeholder="merchant_001" />
+              </div>
+              <div class="form-group">
+                <label for="order-customer">Customer ID</label>
+                <input type="text" id="order-customer" value="cust_123" placeholder="cust_123" />
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="order-email">Customer Email</label>
+              <input type="email" id="order-email" value="customer@example.com" />
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="order-amount">Amount (₹)</label>
+                <input type="number" id="order-amount" value="1999" min="1" step="0.01" />
+              </div>
+              <div class="form-group">
+                <label for="order-currency">Currency</label>
+                <select id="order-currency">
+                  <option value="INR" selected>INR</option>
+                  <option value="USD">USD</option>
+                  <option value="EUR">EUR</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="order-desc">Description</label>
+              <input type="text" id="order-desc" value="Purchase of Premium Laptop" />
+            </div>
+            <div class="form-group">
+              <label for="order-idem-key">
+                Idempotency Key
+                <span class="tooltip-badge" title="Same key = same response, no duplicate orders">?</span>
+              </label>
+              <div class="input-with-btn">
+                <input type="text" id="order-idem-key" placeholder="Leave blank for no idempotency" />
+                <button type="button" class="btn btn-xs" onclick="App.generateIdempotencyKey()">Generate</button>
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary btn-full" id="btn-create-order">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+              Create Order
+            </button>
+          </form>
+          <div class="step-result hidden" id="result-order"></div>
+        </div>
+
+        <!-- Arrow -->
+        <div class="step-arrow">→</div>
+
+        <!-- Step 2: Process Payment -->
+        <div class="sim-step-card" id="step-payment">
+          <div class="step-header">
+            <div class="step-number">2</div>
+            <div class="step-meta">
+              <h3>Process Payment</h3>
+              <p>Charge the order — simulate scenarios</p>
+            </div>
+          </div>
+          <form id="form-payment" class="sim-form">
+            <div class="form-group">
+              <label for="pay-order-ref">Order Reference</label>
+              <input type="text" id="pay-order-ref" placeholder="Auto-filled after Step 1" readonly />
+            </div>
+            <div class="form-group">
+              <label for="pay-method">Payment Method</label>
+              <select id="pay-method" onchange="App.togglePaymentFields()">
+                <option value="card">💳 Card</option>
+                <option value="upi">📱 UPI</option>
+                <option value="netbanking">🏦 Netbanking</option>
+                <option value="wallet">👛 Wallet</option>
+              </select>
+            </div>
+            <div id="card-fields">
+              <div class="form-group">
+                <label for="pay-card">Card Number</label>
+                <input type="text" id="pay-card" value="4111111111111111" maxlength="16" />
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="pay-expiry">Expiry</label>
+                  <input type="text" id="pay-expiry" value="12/26" maxlength="5" />
+                </div>
+                <div class="form-group">
+                  <label for="pay-cvv">CVV</label>
+                  <input type="text" id="pay-cvv" value="123" maxlength="4" />
+                </div>
+              </div>
+            </div>
+            <div id="upi-fields" class="hidden">
+              <div class="form-group">
+                <label for="pay-upi">UPI ID</label>
+                <input type="text" id="pay-upi" placeholder="customer@paytm" />
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="pay-failure">
+                Simulate Failure
+                <span class="tooltip-badge" title="Force a specific failure — blank = random outcome">?</span>
+              </label>
+              <select id="pay-failure">
+                <option value="">None (Random outcome)</option>
+                <option value="insufficient_funds">💸 Insufficient Funds</option>
+                <option value="card_declined">🚫 Card Declined</option>
+                <option value="network_timeout">⏱️ Network Timeout</option>
+                <option value="invalid_cvv">🔐 Invalid CVV</option>
+                <option value="expired_card">📅 Expired Card</option>
+                <option value="fraud_detected">🚨 Fraud Detected</option>
+              </select>
+            </div>
+            <div class="form-group checkbox-group">
+              <label class="checkbox-label">
+                <input type="checkbox" id="pay-hmac-mismatch" />
+                <span class="checkmark"></span>
+                Force HMAC Mismatch (test signature verification failure)
+              </label>
+            </div>
+            <button type="submit" class="btn btn-primary btn-full" id="btn-process-payment" disabled>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+              Process Payment
+            </button>
+          </form>
+          <div class="step-result hidden" id="result-payment"></div>
+        </div>
+
+        <!-- Arrow -->
+        <div class="step-arrow">→</div>
+
+        <!-- Step 3: Refund -->
+        <div class="sim-step-card" id="step-refund">
+          <div class="step-header">
+            <div class="step-number">3</div>
+            <div class="step-meta">
+              <h3>Issue Refund</h3>
+              <p>Full or partial refund on captured payment</p>
+            </div>
+          </div>
+          <form id="form-refund" class="sim-form">
+            <div class="form-group">
+              <label for="refund-payment-ref">Payment Reference</label>
+              <input type="text" id="refund-payment-ref" placeholder="Auto-filled after Step 2" readonly />
+            </div>
+            <div class="form-group">
+              <label for="refund-amount">Refund Amount (₹) — blank = full refund</label>
+              <input type="number" id="refund-amount" placeholder="Leave blank for full refund" min="1" step="0.01" />
+            </div>
+            <div class="form-group">
+              <label for="refund-reason">Reason</label>
+              <select id="refund-reason">
+                <option value="Customer request">Customer Request</option>
+                <option value="Defective product">Defective Product</option>
+                <option value="Order not delivered">Order Not Delivered</option>
+                <option value="Duplicate charge">Duplicate Charge</option>
+                <option value="Fraud">Fraud</option>
+              </select>
+            </div>
+            <button type="submit" class="btn btn-warning btn-full" id="btn-refund" disabled>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/></svg>
+              Issue Refund
+            </button>
+          </form>
+          <div class="step-result hidden" id="result-refund"></div>
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="quick-actions-card">
+        <h3>⚡ Quick Scenario Buttons</h3>
+        <div class="quick-actions-grid">
+          <button class="quick-btn success" onclick="App.runScenario('success')">
+            <span class="q-icon">✅</span>
+            <span class="q-title">Happy Path</span>
+            <span class="q-desc">Order → Captured → Webhook</span>
+          </button>
+          <button class="quick-btn failure" onclick="App.runScenario('card_declined')">
+            <span class="q-icon">🚫</span>
+            <span class="q-title">Card Declined</span>
+            <span class="q-desc">Order → Failed Payment</span>
+          </button>
+          <button class="quick-btn warning" onclick="App.runScenario('hmac_mismatch')">
+            <span class="q-icon">🔐</span>
+            <span class="q-title">HMAC Mismatch</span>
+            <span class="q-desc">Webhook signature failure</span>
+          </button>
+          <button class="quick-btn info" onclick="App.runScenario('idempotency')">
+            <span class="q-icon">♻️</span>
+            <span class="q-title">Idempotency Test</span>
+            <span class="q-desc">Duplicate order prevention</span>
+          </button>
+          <button class="quick-btn refund" onclick="App.runScenario('refund')">
+            <span class="q-icon">💰</span>
+            <span class="q-title">Full Refund Flow</span>
+            <span class="q-desc">Capture → Refund → Webhook</span>
+          </button>
+          <button class="quick-btn retry" onclick="App.runScenario('retry')">
+            <span class="q-icon">🔄</span>
+            <span class="q-title">Trigger Retries</span>
+            <span class="q-desc">Run webhook retry engine</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════════
+         TAB: TRANSACTIONS
+    ════════════════════════════════════════════════════════════════════ -->
+    <div class="tab-content" id="tab-transactions">
+      <div class="table-toolbar">
+        <div class="filter-group">
+          <select id="txn-status-filter" onchange="App.loadTransactions()">
+            <option value="">All Statuses</option>
+            <option value="pending">Pending</option>
+            <option value="processing">Processing</option>
+            <option value="completed">Completed</option>
+            <option value="failed">Failed</option>
+            <option value="refunded">Refunded</option>
+          </select>
+          <input type="text" id="txn-merchant-filter" placeholder="Filter by Merchant ID" onkeyup="App.debounce(App.loadTransactions, 400)()" />
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="App.loadTransactions()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          Refresh
+        </button>
+      </div>
+      <div class="data-table-wrapper">
+        <table class="data-table" id="table-transactions">
+          <thead>
+            <tr>
+              <th>Order Ref</th>
+              <th>Merchant</th>
+              <th>Customer</th>
+              <th>Amount</th>
+              <th>Status</th>
+              <th>Created</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-transactions">
+            <tr><td colspan="6" class="empty-row">No transactions yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════════
+         TAB: WEBHOOKS
+    ════════════════════════════════════════════════════════════════════ -->
+    <div class="tab-content" id="tab-webhooks">
+      <!-- Stats bar -->
+      <div class="webhook-stats-bar" id="webhook-stats-bar">
+        <div class="ws-item"><span class="ws-label">Total</span><span class="ws-val" id="ws-total">0</span></div>
+        <div class="ws-item delivered"><span class="ws-label">Delivered</span><span class="ws-val" id="ws-delivered">0</span></div>
+        <div class="ws-item retrying"><span class="ws-label">Retrying</span><span class="ws-val" id="ws-retrying">0</span></div>
+        <div class="ws-item exhausted"><span class="ws-label">Exhausted</span><span class="ws-val" id="ws-exhausted">0</span></div>
+        <div class="ws-item duplicate"><span class="ws-label">Duplicates</span><span class="ws-val" id="ws-duplicates">0</span></div>
+        <div class="ws-item rate"><span class="ws-label">Delivery Rate</span><span class="ws-val" id="ws-rate">0%</span></div>
+      </div>
+
+      <!-- Filters -->
+      <div class="table-toolbar">
+        <div class="filter-group">
+          <select id="wh-status-filter" onchange="App.loadWebhooks()">
+            <option value="">All Statuses</option>
+            <option value="delivered">Delivered</option>
+            <option value="retrying">Retrying</option>
+            <option value="exhausted">Exhausted</option>
+            <option value="failed">Failed</option>
+          </select>
+          <label class="checkbox-label inline">
+            <input type="checkbox" id="wh-duplicates-only" onchange="App.loadWebhooks()" />
+            Duplicates only
+          </label>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="App.triggerRetry()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M2.5 2v6h6"/><path d="M21.5 22v-6h-6"/><path d="M22 11.5A10 10 0 0 0 3.2 7.2M2 12.5a10 10 0 0 0 18.8 4.2"/></svg>
+          Trigger Retry Engine
+        </button>
+      </div>
+
+      <!-- Webhook Table -->
+      <div class="data-table-wrapper">
+        <table class="data-table" id="table-webhooks">
+          <thead>
+            <tr>
+              <th>Event ID</th>
+              <th>Type</th>
+              <th>Status</th>
+              <th>Attempts</th>
+              <th>HMAC</th>
+              <th>Duplicate</th>
+              <th>Created</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-webhooks">
+            <tr><td colspan="7" class="empty-row">No webhook events yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Webhook Inspector -->
+      <div class="inspector-card" id="webhook-inspector">
+        <h3>🔍 Webhook Inspector</h3>
+        <p class="inspector-hint">Click any webhook event above to inspect its payload and signature</p>
+        <div id="inspector-content" class="hidden">
+          <div class="inspector-grid">
+            <div class="inspector-section">
+              <h4>Event Details</h4>
+              <div class="detail-pairs" id="inspector-details"></div>
+            </div>
+            <div class="inspector-section">
+              <h4>Payload</h4>
+              <pre class="code-block" id="inspector-payload"></pre>
+            </div>
+            <div class="inspector-section">
+              <h4>HMAC Verification</h4>
+              <div class="hmac-section">
+                <div class="hmac-info">
+                  <span class="hmac-label">Signature:</span>
+                  <code class="hmac-sig" id="inspector-sig"></code>
+                </div>
+                <div class="hmac-verify-result" id="hmac-verify-result"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════════
+         TAB: REFUNDS
+    ════════════════════════════════════════════════════════════════════ -->
+    <div class="tab-content" id="tab-refunds">
+      <div class="data-table-wrapper">
+        <table class="data-table" id="table-refunds">
+          <thead>
+            <tr>
+              <th>Refund Ref</th>
+              <th>Payment Ref</th>
+              <th>Amount</th>
+              <th>Type</th>
+              <th>Status</th>
+              <th>Reason</th>
+              <th>Processed At</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-refunds">
+            <tr><td colspan="7" class="empty-row">No refunds yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════════
+         TAB: RETRY ENGINE
+    ════════════════════════════════════════════════════════════════════ -->
+    <div class="tab-content" id="tab-retry">
+      <div class="retry-layout">
+        <div class="retry-explainer">
+          <h2>Exponential Backoff Retry Engine</h2>
+          <p>When a webhook delivery fails, the system queues it for automatic retry using exponential backoff with jitter — preventing the thundering herd problem.</p>
+
+          <div class="retry-timeline">
+            <div class="retry-attempt" data-attempt="1">
+              <div class="attempt-dot success"></div>
+              <div class="attempt-info">
+                <strong>Attempt 1</strong>
+                <span>Immediate delivery</span>
+              </div>
+            </div>
+            <div class="retry-connector fail"></div>
+            <div class="retry-attempt" data-attempt="2">
+              <div class="attempt-dot retry"></div>
+              <div class="attempt-info">
+                <strong>Attempt 2</strong>
+                <span>~1 second delay</span>
+              </div>
+            </div>
+            <div class="retry-connector fail"></div>
+            <div class="retry-attempt" data-attempt="3">
+              <div class="attempt-dot retry"></div>
+              <div class="attempt-info">
+                <strong>Attempt 3</strong>
+                <span>~2 second delay</span>
+              </div>
+            </div>
+            <div class="retry-connector fail"></div>
+            <div class="retry-attempt" data-attempt="4">
+              <div class="attempt-dot retry"></div>
+              <div class="attempt-info">
+                <strong>Attempt 4</strong>
+                <span>~4 second delay</span>
+              </div>
+            </div>
+            <div class="retry-connector fail"></div>
+            <div class="retry-attempt" data-attempt="5">
+              <div class="attempt-dot exhausted"></div>
+              <div class="attempt-info">
+                <strong>Attempt 5</strong>
+                <span>~8 second delay → EXHAUSTED</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="formula-card">
+            <h4>Delay Formula</h4>
+            <div class="formula">delay = base_delay × 2<sup>(attempt-1)</sup> ± 20% jitter</div>
+          </div>
+        </div>
+
+        <div class="retry-live-panel">
+          <div class="panel-header">
+            <h3>Live Retry Queue</h3>
+            <button class="btn btn-primary btn-sm" onclick="App.triggerRetry()">Run Retry Engine</button>
+          </div>
+          <div class="retry-queue" id="retry-queue">
+            <div class="queue-empty">No events in retry queue.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════════
+         TAB: PITFALLS LAB
+    ════════════════════════════════════════════════════════════════════ -->
+    <div class="tab-content" id="tab-pitfalls">
+      <div class="pitfalls-grid">
+
+        <div class="pitfall-card" id="pitfall-idempotency">
+          <div class="pitfall-header">
+            <span class="pitfall-icon">♻️</span>
+            <div>
+              <h3>Idempotency Failures</h3>
+              <span class="severity high">HIGH RISK</span>
+            </div>
+          </div>
+          <p>Without idempotency, retrying a failed network request can result in <strong>double charges</strong>. The simulator enforces idempotency keys to prevent this.</p>
+          <div class="pitfall-demo">
+            <div class="demo-steps">
+              <div class="demo-step">1. Client sends POST /orders with <code>Idempotency-Key: abc123</code></div>
+              <div class="demo-step">2. Network times out — client retries with <strong>same key</strong></div>
+              <div class="demo-step success">3. Server replays cached response — no duplicate order ✓</div>
+            </div>
+          </div>
+          <button class="btn btn-primary" onclick="App.runScenario('idempotency')">Run Demo</button>
+        </div>
+
+        <div class="pitfall-card" id="pitfall-hmac">
+          <div class="pitfall-header">
+            <span class="pitfall-icon">🔐</span>
+            <div>
+              <h3>HMAC Signature Mismatch</h3>
+              <span class="severity critical">CRITICAL</span>
+            </div>
+          </div>
+          <p>If merchants don't verify webhook signatures, attackers can <strong>forge fake payment events</strong>. Always validate the <code>X-Razorpay-Signature</code> header.</p>
+          <div class="pitfall-demo">
+            <div class="demo-steps">
+              <div class="demo-step">1. Attacker sends fake <code>payment.captured</code> event</div>
+              <div class="demo-step">2. HMAC signature doesn't match webhook secret</div>
+              <div class="demo-step fail">3. Event REJECTED — merchant protected ✓</div>
+            </div>
+          </div>
+          <button class="btn btn-primary" onclick="App.runScenario('hmac_mismatch')">Run Demo</button>
+        </div>
+
+        <div class="pitfall-card" id="pitfall-duplicate">
+          <div class="pitfall-header">
+            <span class="pitfall-icon">📬</span>
+            <div>
+              <h3>Duplicate Webhook Events</h3>
+              <span class="severity high">HIGH RISK</span>
+            </div>
+          </div>
+          <p>Payment gateways may deliver the <strong>same event multiple times</strong> during retries. Merchants must implement idempotent webhook handlers using event IDs.</p>
+          <div class="pitfall-demo">
+            <div class="demo-steps">
+              <div class="demo-step">1. Gateway delivers payment.captured (evt_001)</div>
+              <div class="demo-step warn">2. Retry fires same event again (evt_001)</div>
+              <div class="demo-step success">3. Simulator detects duplicate by event_id ✓</div>
+            </div>
+          </div>
+          <button class="btn btn-primary" onclick="App.runScenario('success')">Demo (process twice)</button>
+        </div>
+
+        <div class="pitfall-card" id="pitfall-retry">
+          <div class="pitfall-header">
+            <span class="pitfall-icon">🔄</span>
+            <div>
+              <h3>Retry Exhaustion</h3>
+              <span class="severity medium">MEDIUM</span>
+            </div>
+          </div>
+          <p>If a merchant endpoint is consistently down, webhooks will be retried up to 5 times then marked <strong>EXHAUSTED</strong>. The merchant must reconcile missed events manually.</p>
+          <div class="pitfall-demo">
+            <div class="demo-steps">
+              <div class="demo-step">1. Webhook delivered → 500 error</div>
+              <div class="demo-step warn">2. Retry 1-4 → all fail</div>
+              <div class="demo-step fail">3. Retry 5 → EXHAUSTED, no more retries</div>
+            </div>
+          </div>
+          <button class="btn btn-primary" onclick="App.runScenario('retry')">Trigger Retries</button>
+        </div>
+
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ── Toast Notifications ────────────────────────────────────────────── -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- ── Modal ──────────────────────────────────────────────────────────── -->
+  <div class="modal-overlay hidden" id="modal-overlay">
+    <div class="modal" id="modal">
+      <div class="modal-header">
+        <h3 id="modal-title"></h3>
+        <button class="modal-close" onclick="App.closeModal()">✕</button>
+      </div>
+      <div class="modal-body" id="modal-body"></div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/charts.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
