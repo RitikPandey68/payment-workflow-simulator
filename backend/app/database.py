@@ -5,13 +5,19 @@ from .config import get_settings
 
 settings = get_settings()
 
-engine = create_engine(
-    settings.DATABASE_URL,
+_is_sqlite = settings.DATABASE_URL.startswith("sqlite")
+_engine_kwargs = dict(
     pool_pre_ping=True,
-    pool_size=10,
-    max_overflow=20,
     echo=settings.DEBUG,
 )
+if not _is_sqlite:
+    _engine_kwargs["pool_size"] = 10
+    _engine_kwargs["max_overflow"] = 20
+else:
+    # SQLite requires check_same_thread=False for multi-threaded access
+    _engine_kwargs["connect_args"] = {"check_same_thread": False}
+
+engine = create_engine(settings.DATABASE_URL, **_engine_kwargs)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
